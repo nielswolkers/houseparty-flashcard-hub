@@ -1,5 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { importQuizletUrl, importStudyGo } from "@/lib/importers.functions";
 import { addSet, deleteSet, loadSets, parseExport, type Card, type StudySet } from "@/lib/sets";
 
 export const Route = createFileRoute("/")({
@@ -67,6 +68,45 @@ function Home() {
   );
 }
 
+function AutoImport({ mode, onDone }: { mode: string; onDone: () => void }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [url, setUrl] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+  const run = async () => {
+    setBusy(true);
+    setMsg("");
+    try {
+      const sets = mode === "StudyGo"
+        ? await importStudyGo({ data: { email, password } })
+        : [await importQuizletUrl({ data: { url } })];
+      sets.forEach((s) => addSet({ ...s, source: mode }));
+      setMsg(`Imported ${sets.length} set(s)!`);
+      setTimeout(onDone, 800);
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "Import failed");
+    }
+    setBusy(false);
+  };
+  return (
+    <div className="mb-3 rounded-lg border-2 border-primary p-3">
+      <p className="mb-2 font-bold">{mode === "StudyGo" ? "Sign in with StudyGo — imports all your lists" : "Auto-fetch a Quizlet set from its link"}</p>
+      {mode === "StudyGo" ? (
+        <div className="grid gap-2 sm:grid-cols-2">
+          <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="StudyGo email" className="rounded-md border bg-background p-2" />
+          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="StudyGo password" className="rounded-md border bg-background p-2" />
+        </div>
+      ) : (
+        <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://quizlet.com/123456789/..." className="w-full rounded-md border bg-background p-2" />
+      )}
+      <button disabled={busy} onClick={run} className="mt-2 rounded-md bg-primary px-4 py-2 font-semibold text-primary-foreground">{busy ? "Importing…" : mode === "StudyGo" ? "Sign in & import all" : "Fetch set"}</button>
+      {msg && <p className="mt-2 text-sm">{msg}</p>}
+      {mode === "StudyGo" && <p className="mt-1 text-xs text-muted-foreground">Your password is sent straight to StudyGo and never stored.</p>}
+    </div>
+  );
+}
+
 function Editor({ mode, onClose }: { mode: string; onClose: () => void }) {
   const nav = useNavigate();
   const [title, setTitle] = useState("");
@@ -88,6 +128,8 @@ function Editor({ mode, onClose }: { mode: string; onClose: () => void }) {
         <h2 className="text-lg font-bold">{isImport ? `Import from ${mode}` : "Create a new set"}</h2>
         <button onClick={onClose} className="text-sm text-muted-foreground">Close</button>
       </div>
+      {isImport && <AutoImport mode={mode} onDone={onClose} />}
+      {isImport && <p className="mb-2 mt-4 text-sm font-semibold">Or paste an export:</p>}
       {isImport && (
         <div className="mb-3 rounded-lg bg-accent p-3 text-sm">
           <a href={mode === "Quizlet" ? "https://quizlet.com/login" : "https://studygo.com/en/login"} target="_blank" rel="noreferrer" className="mb-2 inline-block rounded-md bg-primary px-3 py-1.5 font-semibold text-primary-foreground">Sign in to {mode} ↗</a>
