@@ -53,7 +53,7 @@ function Flashcards({ set }: { set: StudySet }) {
   return (
     <div>
       <button onClick={() => setFlip(!flip)} className="flex h-64 w-full items-center justify-center rounded-2xl border bg-card p-6 text-center text-2xl font-semibold shadow-md">
-        {flip ? c.definition : c.term}
+        {flip ? c?.definition : c?.term}
       </button>
       <div className="mt-3 flex items-center justify-center gap-4">
         <button onClick={() => go(-1)} className="rounded-md border px-4 py-2">←</button>

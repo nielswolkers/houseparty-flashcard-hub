@@ -91,7 +91,7 @@ function Editor({ mode, onClose }: { mode: string; onClose: () => void }) {
       {isImport && (
         <div className="mb-3 rounded-lg bg-accent p-3 text-sm">
           <a href={mode === "Quizlet" ? "https://quizlet.com/login" : "https://studygo.com/en/login"} target="_blank" rel="noreferrer" className="mb-2 inline-block rounded-md bg-primary px-3 py-1.5 font-semibold text-primary-foreground">Sign in to {mode} ↗</a>
-          <ol className="list-decimal pl-5">{STEPS[mode].map((s) => <li key={s}>{s}</li>)}</ol>
+          <ol className="list-decimal pl-5">{(STEPS[mode] ?? []).map((s) => <li key={s}>{s}</li>)}</ol>
         </div>
       )}
       <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Set title" className="mb-3 w-full rounded-md border bg-background p-2" />
