@@ -5,19 +5,6 @@ type Imported = { title: string; cards: Card[] };
 
 const API = "https://api.wrts.nl/api/v3";
 
-// Pull term/definition pairs out of StudyGo's list JSON, whatever shape it uses.
-function cardsFromList(list: any): Card[] {
-  const rows: any[] = list?.word_queries ?? list?.words ?? list?.items ?? [];
-  return rows
-    .map((r) => {
-      const w = r?.words ?? r?.word_queries ?? r;
-      if (Array.isArray(w) && w.length >= 2) return { term: String(w[0]?.word ?? w[0]), definition: String(w[1]?.word ?? w[1]) };
-      if (r?.term) return { term: String(r.term), definition: String(r.definition ?? "") };
-      return null;
-    })
-    .filter((c): c is Card => !!c && !!c.term && !!c.definition);
-}
-
 export const importStudyGo = createServerFn({ method: "POST" })
   .inputValidator((d: { email: string; password: string }) => {
     if (!d?.email || !d?.password) throw new Error("Email and password required");
@@ -34,19 +21,24 @@ export const importStudyGo = createServerFn({ method: "POST" })
     if (!auth_token) throw new Error("StudyGo did not return a session");
     const h = { "x-auth-token": auth_token };
 
-    const res = await fetch(`${API}/lists`, { headers: h });
+    const me = await fetch(`${API}/get_user_data`, { headers: h });
+    if (!me.ok) throw new Error(`Could not read your StudyGo profile (${me.status})`);
+    const { username } = (await me.json()) as { username?: string };
+    const res = await fetch(`${API}/public/users/${username}/practiceable_items`, { headers: h });
     if (!res.ok) throw new Error(`Could not read your StudyGo lists (${res.status})`);
     const body: any = await res.json();
-    const lists: any[] = Array.isArray(body) ? body : body.lists ?? body.results ?? [];
+    const lists: any[] = Array.isArray(body) ? body : body.results ?? body.practiceable_items ?? [];
 
     const out: Imported[] = [];
     for (const l of lists.slice(0, 100)) {
-      let cards = cardsFromList(l);
-      if (!cards.length && l.id) {
-        const d = await fetch(`${API}/lists/${l.id}`, { headers: h });
-        if (d.ok) cards = cardsFromList(await d.json());
-      }
-      if (cards.length) out.push({ title: String(l.title ?? l.name ?? "StudyGo list"), cards });
+      if (!l?.id) continue;
+      const d = await fetch(`${API}/lists/${l.id}`, { headers: h });
+      if (!d.ok) continue;
+      const j: any = await d.json();
+      const cards = ((j.words_with_performance ?? []) as any[])
+        .map((w) => (Array.isArray(w?.words) && w.words.length >= 2 ? { term: String(w.words[0]), definition: String(w.words[1]) } : null))
+        .filter((c): c is Card => !!c && !!c.term && !!c.definition);
+      if (cards.length) out.push({ title: String(j.title ?? l.title ?? "StudyGo list"), cards });
     }
     return out;
   });
